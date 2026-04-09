@@ -46,11 +46,6 @@ pub(super) enum AgenticLoopResult {
         error: Error,
         turn_usage: TurnUsageSummary,
     },
-    /// Auth flow initiated — config card already sent, suppress text response.
-    AuthPending {
-        instructions: String,
-        turn_usage: TurnUsageSummary,
-    },
 }
 
 #[derive(Debug, Clone, Default)]
@@ -318,7 +313,6 @@ impl Agent {
                 pending,
                 turn_usage,
             }),
-            Ok(LoopOutcome::AuthPending(instructions)) => Ok(AgenticLoopResult::AuthPending { instructions, turn_usage }),
             Err(error) => Ok(AgenticLoopResult::Failed { error, turn_usage }),
         }
     }
@@ -1208,9 +1202,9 @@ impl<'a> LoopDelegate for ChatDelegate<'a> {
             }
         }
 
-        // Return auth-pending after all results are recorded (card already sent)
+        // Return auth response after all results are recorded
         if let Some(instructions) = deferred_auth {
-            return Ok(Some(LoopOutcome::AuthPending(instructions)));
+            return Ok(Some(LoopOutcome::Response(instructions)));
         }
 
         // Handle approval if a tool needed it
@@ -2738,9 +2732,6 @@ mod tests {
             super::AgenticLoopResult::Failed { error, .. } => {
                 panic!("Expected text response, got Failed: {error}");
             }
-            super::AgenticLoopResult::AuthPending { .. } => {
-                panic!("Expected text response, got AuthPending");
-            }
         }
     }
 
@@ -2785,9 +2776,6 @@ mod tests {
                 }
                 super::AgenticLoopResult::Failed { error, .. } => {
                     panic!("expected a text response, got Failed: {error}");
-                }
-                super::AgenticLoopResult::AuthPending { .. } => {
-                    panic!("expected a text response, got AuthPending");
                 }
             }
         }
