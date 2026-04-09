@@ -124,7 +124,8 @@ fn turn_usage_from_result(result: &Result<AgenticLoopResult, Error>) -> Option<&
     match result {
         Ok(AgenticLoopResult::Response { turn_usage, .. })
         | Ok(AgenticLoopResult::NeedApproval { turn_usage, .. })
-        | Ok(AgenticLoopResult::Failed { turn_usage, .. }) => Some(turn_usage),
+        | Ok(AgenticLoopResult::Failed { turn_usage, .. })
+        | Ok(AgenticLoopResult::AuthPending { turn_usage, .. }) => Some(turn_usage),
         Err(_) => None,
     }
 }
@@ -753,6 +754,39 @@ impl Agent {
                     allow_always,
                 })
             }
+            Ok(AgenticLoopResult::AuthPending {
+                instructions,
+                turn_usage,
+            }) => {
+                // Auth-required status already sent by the dispatcher.
+                // Persist the turn + instructions to DB (like a Response) but
+                // suppress the text SSE event by returning auth_pending.
+                thread.complete_turn(&instructions);
+                let (turn_number, tool_calls, narrative) = thread
+                    .turns
+                    .last()
+                    .map(|t| (t.turn_number, t.tool_calls.clone(), t.narrative.clone()))
+                    .unwrap_or_default();
+                self.persist_tool_calls(
+                    thread_id,
+                    &message.channel,
+                    &message.user_id,
+                    turn_number,
+                    &tool_calls,
+                    narrative.as_deref(),
+                )
+                .await;
+                self.persist_assistant_response(
+                    thread_id,
+                    &message.channel,
+                    &message.user_id,
+                    &instructions,
+                )
+                .await;
+                self.send_turn_cost_status(&message.channel, &message.metadata, &turn_usage)
+                    .await;
+                Ok(SubmissionResult::auth_pending())
+            }
             Ok(AgenticLoopResult::Failed { error, turn_usage }) => {
                 self.send_turn_cost_status(&message.channel, &message.metadata, &turn_usage)
                     .await;
@@ -1344,7 +1378,7 @@ impl Agent {
                     instructions.clone(),
                 )
                 .await;
-                return Ok(SubmissionResult::response(instructions));
+                return Ok(SubmissionResult::auth_pending());
             }
 
             context_messages.push(ChatMessage::tool_result(
@@ -1547,7 +1581,7 @@ impl Agent {
             // === Phase 3: Post-flight (sequential, in original order) ===
             // Process all results before any conditional return so every
             // tool result is recorded in the session audit trail.
-            let mut deferred_auth: Option<String> = None;
+            let mut deferred_auth = false;
 
             for (tc, deferred_result) in exec_results {
                 if let Ok(ref output) = deferred_result
@@ -1595,7 +1629,7 @@ impl Agent {
                 }
 
                 // Auth detection — defer return until all results are recorded
-                if deferred_auth.is_none()
+                if !deferred_auth
                     && let Some((ext_name, instructions)) =
                         check_auth_required(&tc.name, &deferred_result)
                 {
@@ -1608,15 +1642,15 @@ impl Agent {
                         instructions.clone(),
                     )
                     .await;
-                    deferred_auth = Some(instructions);
+                    deferred_auth = true;
                 }
 
                 context_messages.push(ChatMessage::tool_result(&tc.id, &tc.name, deferred_content));
             }
 
-            // Return auth response after all results are recorded
-            if let Some(instructions) = deferred_auth {
-                return Ok(SubmissionResult::response(instructions));
+            // Return auth-pending after all results are recorded (card already sent)
+            if deferred_auth {
+                return Ok(SubmissionResult::auth_pending());
             }
 
             // Handle approval if a tool needed it
@@ -1766,6 +1800,36 @@ impl Agent {
                         parameters,
                         allow_always,
                     })
+                }
+                Ok(AgenticLoopResult::AuthPending {
+                    instructions,
+                    turn_usage,
+                }) => {
+                    thread.complete_turn(&instructions);
+                    let (turn_number, tool_calls, narrative) = thread
+                        .turns
+                        .last()
+                        .map(|t| (t.turn_number, t.tool_calls.clone(), t.narrative.clone()))
+                        .unwrap_or_default();
+                    self.persist_tool_calls(
+                        thread_id,
+                        &message.channel,
+                        &message.user_id,
+                        turn_number,
+                        &tool_calls,
+                        narrative.as_deref(),
+                    )
+                    .await;
+                    self.persist_assistant_response(
+                        thread_id,
+                        &message.channel,
+                        &message.user_id,
+                        &instructions,
+                    )
+                    .await;
+                    self.send_turn_cost_status(&message.channel, &message.metadata, &turn_usage)
+                        .await;
+                    Ok(SubmissionResult::auth_pending())
                 }
                 Ok(AgenticLoopResult::Failed { error, turn_usage }) => {
                     self.send_turn_cost_status(&message.channel, &message.metadata, &turn_usage)
