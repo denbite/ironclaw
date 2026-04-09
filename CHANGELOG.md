@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.25.0](https://github.com/nearai/ironclaw/compare/ironclaw-v0.24.0...ironclaw-v0.25.0) - 2026-04-09
+
+### Added
+
+- *(jobs)* per-job MCP server filtering and max_iterations cap ([#1243](https://github.com/nearai/ironclaw/pull/1243))
+- *(config)* unify all settings to DB > env > default priority ([#1722](https://github.com/nearai/ironclaw/pull/1722))
+- *(telegram)* add sendVoice support for audio/ogg attachments ([#1314](https://github.com/nearai/ironclaw/pull/1314))
+- *(setup)* build ironclaw-worker Docker image in setup wizard ([#1757](https://github.com/nearai/ironclaw/pull/1757))
+
+### Fixed
+
+- *(relay)* thread responses under original message in Slack channels ([#1848](https://github.com/nearai/ironclaw/pull/1848))
+- *(worker)* Improve command execution parameter validation ([#1692](https://github.com/nearai/ironclaw/pull/1692))
+- *(telegram)* auto-generate webhook secret during setup ([#1536](https://github.com/nearai/ironclaw/pull/1536))
+- *(builder)* accept inline-table and object-map dependency formats from LLM ([#1748](https://github.com/nearai/ironclaw/pull/1748))
+- *(gemini)* preserve and echo thoughtSignature for Gemini 3.x function calls ([#1752](https://github.com/nearai/ironclaw/pull/1752))
+- *(relay)* route async Slack messages to correct channel instead of DMs ([#1845](https://github.com/nearai/ironclaw/pull/1845))
+- *(security)* block cross-channel approval thread hijacking ([#1590](https://github.com/nearai/ironclaw/pull/1590))
+- *(builder)* add approval context propagation for sub-tool execution ([#1125](https://github.com/nearai/ironclaw/pull/1125))
+
+### Other
+
+- bump registry versions for github tool, whatsapp and telegram channels
+- *(e2e)* add agent loop recovery coverage ([#1854](https://github.com/nearai/ironclaw/pull/1854))
+- disable cooldown in gateway webhook workflow test ([#1889](https://github.com/nearai/ironclaw/pull/1889))
+- Expand GitHub WASM tool surface ([#1884](https://github.com/nearai/ironclaw/pull/1884))
+- *(e2e)* cover chat approval parity across channels ([#1858](https://github.com/nearai/ironclaw/pull/1858))
+- add routine coverage for issue 1781 ([#1856](https://github.com/nearai/ironclaw/pull/1856))
+
 ## [0.24.0](https://github.com/nearai/ironclaw/compare/ironclaw-v0.23.0...ironclaw-v0.24.0) - 2026-03-31
 
 ### Added
